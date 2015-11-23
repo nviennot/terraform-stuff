@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+main() {
+  export DEBIAN_FRONTEND='noninteractive'
+
+  set -o errexit
+  set -o xtrace
+
+  apt-get update -y
+
+  __format_and_mount_local_ssd
+  __install_docker
+  __update_grub
+  __update_ufw
+}
+
+__format_and_mount_local_ssd() {
+  if [[ -f /mnt/scratch/.done ]] ; then
+    return
+  fi
+
+  mkdir -p /mnt/scratch
+  /usr/share/google/safe_format_and_mount \
+    -m "mkfs.ext4 -F" /dev/disk/by-id/google-local-ssd-0 /mnt/scratch
+  chown -R ubuntu /mnt/scratch
+  date -u > /mnt/scratch/.done
+}
+
+__install_docker() {
+  if docker version &>/dev/null ; then
+    return
+  fi
+
+  apt-key adv \
+    --keyserver hkp://p80.pool.sks-keyservers.net:80 \
+    --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
+  mkdir -p /etc/apt/sources.list.d
+  echo 'deb https://apt.dockerproject.org/repo ubuntu-trusty main' > \
+    /etc/apt/sources.list.d/docker.list
+
+  apt-get update -y
+  apt-cache policy docker-engine
+  apt-get install -yqq linux-image-extra-$(uname -r) docker-engine
+
+  echo 'DOCKER_OPTS="-g /mnt/scratch/docker"' >> /etc/default/docker
+  restart docker
+
+  docker run hello-world
+
+  usermod -aG docker ubuntu
+}
+
+__update_grub() {
+  GRUB_CLOUD_INIT="/etc/default/grub.d/99-cloud-init.sh"
+
+  if grep -qE 'GRUB_CMDLINE_LINUX.*cgroup_enable' $GRUB_CLOUD_INIT ; then
+    return
+  fi
+
+  mkdir -p $(dirname $GRUB_CLOUD_INIT)
+  echo 'GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount=1"' > \
+    $GRUB_CLOUD_INIT
+  update-grub
+}
+
+__update_ufw() {
+  if ! ufw status &>/dev/null ; then
+    return
+  fi
+
+  if grep -qE 'DEFAULT_FORWARD_POLICY.*ACCEPT' /etc/default/ufw ; then
+    return
+  fi
+
+  touch /etc/default/ufw
+  sed -i '/DEFAULT_FORWARD_POLICY/d' /etc/default/ufw
+  echo 'DEFAULT_FORWARD_POLICY="ACCEPT"' >> /etc/default/ufw
+  ufw reload
+  ufw allow 2375/tcp
+}
+
+main "$@"

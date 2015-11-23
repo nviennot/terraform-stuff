@@ -54,3 +54,36 @@ resource "google_compute_instance" "ubuntu_trusty_micro_playground" {
     }
   }
 }
+
+resource "google_compute_address" "docker_builder" {
+  name = "docker-builder"
+  region = "us-central1"
+}
+
+resource "google_compute_instance" "docker_builder" {
+  count = 1
+  name = "docker-builder"
+  machine_type = "n1-standard-4"
+  zone = "us-central1-f"
+  tags = ["docker-builder"]
+  can_ip_forward = false
+  metadata_startup_script = "${file("cloud-init/docker-builder")}"
+
+  disk {
+    auto_delete = true
+    image = "ubuntu-1404-trusty-v20150909a"
+    type = "pd-ssd"
+  }
+
+  disk {
+    type = "local-ssd"
+    scratch = true
+  }
+
+  network_interface {
+    network = "default"
+    access_config {
+      nat_ip = "${google_compute_address.docker_builder.address}"
+    }
+  }
+}
