@@ -84,6 +84,10 @@ __install_docker() {
 }
 
 __install_packer() {
+  if packer version &>/dev/null ; then
+    return
+  fi
+
   apt-get update -y
   apt-get install -yqq unzip
 
