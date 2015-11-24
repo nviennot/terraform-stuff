@@ -63,7 +63,7 @@ resource "google_compute_address" "docker_builder" {
 resource "google_compute_instance" "docker_builder" {
   count = 1
   name = "docker-builder"
-  machine_type = "n1-standard-4"
+  machine_type = "n1-standard-2"
   zone = "us-central1-f"
   tags = ["docker-builder"]
   can_ip_forward = false
