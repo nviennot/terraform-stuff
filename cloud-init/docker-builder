@@ -5,11 +5,13 @@ main() {
 
   set -o errexit
   set -o xtrace
+  shopt -s nullglob
 
   apt-get update -y
 
   __format_and_mount_local_ssd
   __install_docker
+  __install_packer
   __update_grub
   __update_ufw
 }
@@ -48,6 +50,20 @@ __install_docker() {
   docker run hello-world
 
   usermod -aG docker ubuntu
+}
+
+__install_packer() {
+  apt-get update -y
+  apt-get install -yqq unzip
+
+  local packer_url='https://releases.hashicorp.com/packer/0.8.6/packer_0.8.6_linux_amd64.zip'
+  local local_zip="/var/tmp/$(basename "${packer_url}")"
+
+  mkdir -p /usr/local/bin $(dirname "${local_zip}")
+  curl -sSL -o "${local_zip}" "${packer_url}"
+
+  unzip -d /usr/local/bin -u "${local_zip}"
+  chmod +x /usr/local/bin/packer*
 }
 
 __update_grub() {
